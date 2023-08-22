@@ -8,7 +8,7 @@ end
 
 function module.GetRotationBetween(U: Vector3, V: Vector3, Axis: Vector3)
 	local Dot, UXV = U:Dot(V), U:Cross(V)
-	if Dot < -0.99999 then
+	if Dot < -0.999999999 then
 		return CFrame.fromAxisAngle(Axis, math.pi)
 	end
 	return CFrame.new(0, 0, 0, UXV.X, UXV.Y, UXV.Z, 1 + Dot)
