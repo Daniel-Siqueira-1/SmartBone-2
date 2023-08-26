@@ -185,7 +185,7 @@ end
 function Class:StepPhysics(BoneTree, Force)
 	debug.profilebegin("Bone::StepPhysics")
 	if self.Anchored then
-		self.LastPosition = self.TransformOffset.Position
+		self.LastPosition = self.Position
 		self.Position = self.TransformOffset.Position
 
 		debug.profileend()
