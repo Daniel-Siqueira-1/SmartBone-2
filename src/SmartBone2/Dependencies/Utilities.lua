@@ -14,6 +14,18 @@ function module.GetRotationBetween(U: Vector3, V: Vector3, Axis: Vector3)
 	return CFrame.new(0, 0, 0, UXV.X, UXV.Y, UXV.Z, 1 + Dot)
 end
 
+function module.GetCFrameAxis(Transform: CFrame, Axis: string)
+	local X, Y, Z = Transform:ToEulerAnglesXYZ()
+	if Axis == "X" then
+		return X
+	elseif Axis == "Y" then
+		return Y
+	elseif Axis == "Z" then
+		return Z
+	end
+	return nil
+end
+
 function module.GatherObjectSettings(Object)
 	local Settings = {}
 

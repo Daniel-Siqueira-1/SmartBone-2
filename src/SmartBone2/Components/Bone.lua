@@ -237,17 +237,17 @@ function Class:SolveTransform(BoneTree, Delta) -- Parallel safe
 	if ParentBone and BoneParent and BoneParent:IsA("Bone") and BoneParent ~= BoneTree.RootBone then
 		local X = Utilities.GetCFrameAxis(BoneParent.WorldCFrame, "X")
 		local _, Y, Z = ParentBone.TransformOffset:ToEulerAnglesXYZ()
-		
-		local ReferenceRotation = CFrame.fromEulerAnglesXYZ(X, Y, Z).Rotation
-		local ReferenceCFrame = CFrame.new(ParentBone.TransformOffset.Position) * ReferenceRotation --CFrame.new(BoneParent.WorldPosition) * RefrenceRotation
-		
-		local Vector0 = ReferenceCFrame:VectorToWorldSpace(ParentBone.LocalTransformOffset.Position)
+
+		local RefrenceRotation = CFrame.fromEulerAnglesXYZ(X, Y, Z).Rotation
+		local ReferenceCFrame = CFrame.new(BoneParent.WorldPosition) * RefrenceRotation
+
+		local Vector0 = ReferenceCFrame:PointToObjectSpace(ParentBone.LocalTransformOffset.Position)
 		local Vector1 = self.Position - ParentBone.Position
-		
-		local Rotation = Utilities.fromToRotation(Vector0, Vector1).Rotation * ReferenceCFrame.Rotation
-		
-		local Alpha = .99999 ^ Delta
-		
+
+		local Rotation = Utilities.GetRotationBetween(ReferenceCFrame.UpVector, Vector1, Vector0).Rotation * ReferenceCFrame.Rotation
+
+		local Alpha = 0.99999 ^ Delta
+
 		ParentBone.CalculatedWorldCFrame = BoneParent.WorldCFrame:Lerp(CFrame.new(ParentBone.Position) * Rotation, Alpha)
 	end
 	debug.profileend()
