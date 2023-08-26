@@ -52,7 +52,7 @@ function Class.new(RootBone: Bone, RootPart: BasePart, Gravity: Vector3): IBoneT
 		Force = Vector3.zero,
 		RestGravity = Vector3.zero,
 		ObjectMove = Vector3.zero,
-		ObjectPreviousPosition = Vector3.zero,
+		ObjectPreviousPosition = RootPart.Position,
 	}, Class)
 end
 
@@ -80,6 +80,7 @@ function Class:StepPhysics(Delta)
 	Force -= ProjectedForce
 	Force = (Force + Settings.Force) * Delta
 
+	-- Remove
 	Settings.WindDirection = SafeUnit(workspace.GlobalWind)
 	Settings.WindSpeed = workspace.GlobalWind.Magnitude
 
