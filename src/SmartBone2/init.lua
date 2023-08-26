@@ -106,11 +106,12 @@ function Class:m_CreateBoneTree(RootPart: BasePart, RootBone: Bone)
 	local function AddChildren(Bone, HeirarchyLength)
 		local Children = Bone:GetChildren()
 
-		for _, Child in Children do
+		for i = 1, #Children do
+			local Child = Children[i]
 			if Child:IsA("Bone") then
 				self:m_AppendBone(BoneTree, Child, HeirarchyLength)
 
-				AddChildren(Child, HeirarchyLength + 1)
+				AddChildren(Child, #BoneTree.Bones)
 			end
 		end
 
