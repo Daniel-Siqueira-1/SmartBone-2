@@ -9,9 +9,54 @@ local SphereSolver = require(CollisionSolvers:WaitForChild("Sphere"))
 local Gizmo = require(Dependencies:WaitForChild("Gizmo"))
 Gizmo.Init()
 
+--- @class Collider
+--- Internal class for colliders
+--- :::caution Caution: Warning
+--- Changes to the syntax in this class will not count to the major version in semver.
+--- :::
+
+--- @within Collider
+--- @prop Type string
+
+--- @within Collider
+--- @prop Scale Vector3
+
+--- @within Collider
+--- @prop Offset Vector3
+
+--- @within Collider
+--- @prop Rotation Vector3
+
+--- @within Collider
+--- @prop PreviousScale Vector3
+
+--- @within Collider
+--- @prop PreviousOffset Vector3
+
+--- @within Collider
+--- @prop PreviousRotation Vector3
+
+--- @within Collider
+--- @private
+--- @readonly
+--- @prop m_Object BasePart
+
+--- @within Collider
+--- @prop ObjectConnection RBXScriptConnection
+
+--- @within Collider
+--- @prop Transform CFrame
+
+--- @within Collider
+--- @prop Size Vector3
+
+--- @within Collider
+--- @prop GUID string
+
 local Class = {}
 Class.__index = Class
 
+--- @within Collider
 function Class.new()
 	local self = setmetatable({
 		Type = "Box",
@@ -35,6 +80,8 @@ function Class.new()
 	return self
 end
 
+--- @within Collider
+--- @param Object BasePart
 function Class:SetObject(Object: BasePart)
 	if self.ObjectConnection then
 		self.ObjectConnection:Disconnect()
@@ -51,6 +98,7 @@ function Class:SetObject(Object: BasePart)
 	end)
 end
 
+--- @within Collider
 function Class:UpdateTransform()
 	if self.m_Object == nil then
 		return
@@ -75,9 +123,10 @@ function Class:UpdateTransform()
 	self.Size = ScaledSize
 end
 
+--- @within Collider
+--- @param Point Vector3
+--- @param Radius number
 function Class:GetClosestPoint(Point, Radius)
-	-- Determine which collision solver we should send this off to
-	debug.profilebegin("Determine Diff")
 	if self.Scale ~= self.PreviousScale then
 		self:UpdateTransform()
 		self.PreviousScale = self.Scale
@@ -92,10 +141,10 @@ function Class:GetClosestPoint(Point, Radius)
 		self:UpdateTransform()
 		self.PreviousRotation = self.Rotation
 	end
-	debug.profileend()
 
 	local Type = self.Type
 
+	-- Determine which collision solver we should send this off to
 	if Type == "Box" then
 		return BoxSolver(self.Transform, self.Size, Point, Radius)
 	end
@@ -111,8 +160,11 @@ function Class:GetClosestPoint(Point, Radius)
 	warn(`Invalid collider shape: {Type}`)
 end
 
-function Class:DrawDebug()
+--- @within Collider
+--- @param FILL_COLLIDER boolean
+function Class:DrawDebug(FILL_COLLIDER)
 	local COLLIDER_COLOR = Color3.new(0.509803, 0.933333, 0.427450)
+	local FILL_COLOR = Color3.new(0.901960, 0.784313, 0.513725)
 
 	local Type = self.Type
 	local Transform = self.Transform
@@ -124,6 +176,12 @@ function Class:DrawDebug()
 		Gizmo.PushProperty("Color3", COLLIDER_COLOR)
 		Gizmo.Box:Draw(Transform, Size)
 
+		if FILL_COLLIDER then
+			Gizmo.SetStyle(FILL_COLOR, 0.75, false)
+			Gizmo.VolumeBox:Draw(Transform, Size)
+			Gizmo.PushProperty("Transparency", 0)
+		end
+
 		return
 	end
 
@@ -134,6 +192,19 @@ function Class:DrawDebug()
 		Gizmo.PushProperty("Color3", COLLIDER_COLOR)
 		Gizmo.Capsule:Draw(Transform, CapsuleRadius, CapsuleLength, 15)
 
+		if FILL_COLLIDER then
+			local TransformedTransform = Transform * CFrame.Angles(math.rad(90), -math.rad(90), 0)
+
+			local Top = TransformedTransform.Position + TransformedTransform.UpVector * (CapsuleLength / 2)
+			local Bottom = TransformedTransform.Position - TransformedTransform.UpVector * (CapsuleLength / 2)
+
+			Gizmo.SetStyle(FILL_COLOR, 0.75, false)
+			Gizmo.VolumeCylinder:Draw(Transform, CapsuleRadius, CapsuleLength)
+			Gizmo.VolumeSphere:Draw(CFrame.new(Top), CapsuleRadius)
+			Gizmo.VolumeSphere:Draw(CFrame.new(Bottom), CapsuleRadius)
+			Gizmo.PushProperty("Transparency", 0)
+		end
+
 		return
 	end
 
@@ -143,8 +214,23 @@ function Class:DrawDebug()
 		Gizmo.PushProperty("Color3", COLLIDER_COLOR)
 		Gizmo.Sphere:Draw(Transform, Radius, 15, 360)
 
+		if FILL_COLLIDER then
+			Gizmo.SetStyle(FILL_COLOR, 0.75, false)
+			Gizmo.VolumeSphere:Draw(Transform, Radius)
+			Gizmo.PushProperty("Transparency", 0)
+		end
+
 		return
 	end
+end
+
+--- @within Collider
+function Class:Destroy()
+	if self.ObjectConnection then
+		self.ObjectConnection:Disconnect()
+	end
+
+	setmetatable(self, nil)
 end
 
 return Class
