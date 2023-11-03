@@ -12,6 +12,10 @@ function module.GetRotationBetween(U: Vector3, V: Vector3)
 	return CFrame.fromAxisAngle(W, Angle)
 end
 
+function module.MirrorVector(v, axis)
+	return v - axis * (v:Dot(axis) * 2)
+end
+
 function module.GetCFrameAxis(Transform: CFrame, Axis: string)
 	local X, Y, Z = Transform:ToEulerAnglesXYZ()
 	if Axis == "X" then

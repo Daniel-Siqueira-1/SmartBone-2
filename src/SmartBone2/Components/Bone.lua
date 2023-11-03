@@ -361,12 +361,15 @@ function Class:SolveTransform(BoneTree, Delta) -- Parallel safe
 
 	if ParentBone and BoneParent and BoneParent:IsA("Bone") and BoneParent ~= BoneTree.RootBone then
 		local ReferenceCFrame = ParentBone.TransformOffset
-		local v1 = self.Position - ParentBone.Position
-		local Rotation = Utilities.GetRotationBetween(ReferenceCFrame.UpVector, v1).Rotation * ReferenceCFrame.Rotation
+		--local v1 = self.Position - ParentBone.Position
+		--local Rotation = Utilities.GetRotationBetween(ReferenceCFrame.UpVector, v1).Rotation * ReferenceCFrame.Rotation
+		local v0 = ParentBone.TransformOffset.Rotation.UpVector-- * self.LocalTransformOffset.Position
+		local v1 = Utilities.MirrorVector(self.Position - ParentBone.Position, Vector3.xAxis)
 
+		local Rotation = ParentBone.TransformOffset.Rotation * Quaternion.fromToRotation(v0, v1):ToCFrame()
 		local factor = 0.00001
 		local alpha = (1 - factor ^ Delta)
-
+			
 		ParentBone.CalculatedWorldCFrame = BoneParent.WorldCFrame:Lerp(CFrame.new(ParentBone.Position) * Rotation, alpha)
 	end
 	debug.profileend()

@@ -118,10 +118,10 @@ end
 --- :::
 --- Creates a bone tree from the RootPart and RootBone and then adds all child bones via m_AppendBone
 function Class:m_CreateBoneTree(RootPart: BasePart, RootBone: Bone)
-	local Settings = Utilities.GatherObjectSettings(RootPart)
-	local BoneTree = BoneTreeClass.new(RootBone, RootPart, Settings.Gravity)
+    local Settings = Utilities.GatherObjectSettings(RootPart)
+    local BoneTree = BoneTreeClass.new(RootBone, RootPart, Settings.Gravity)
 
-	BoneTree.Settings = Settings
+    BoneTree.Settings = Settings
 
 	SB_VERBOSE_LOG(`Creating bone tree {RootPart.Name}; {RootBone.Name}`)
 	SB_INDENT_LOG()
@@ -131,14 +131,13 @@ function Class:m_CreateBoneTree(RootPart: BasePart, RootBone: Bone)
 		SB_INDENT_LOG()
 		local Children = Bone:GetChildren()
 
-		for i = 1, #Children do
-			local Child = Children[i]
-			if Child:IsA("Bone") then
-				self:m_AppendBone(BoneTree, Child, ParentIndex, HeirarchyLength)
+        for _, Child in Children do
+            if Child:IsA("Bone") then
+                self:m_AppendBone(BoneTree, Child, ParentIndex, HeirarchyLength)
 
-				AddChildren(Child, #BoneTree.Bones)
-			end
-		end
+                AddChildren(Child, #BoneTree.Bones, HeirarchyLength + 1)
+            end
+        end
 
 		if #Children == 0 then -- Add tail bone for transform calculations
 			SB_VERBOSE_LOG(`Adding tail bone`)
@@ -148,7 +147,7 @@ function Class:m_CreateBoneTree(RootPart: BasePart, RootBone: Bone)
 			tailBone.Name = Bone.Name .. "_Tail"
 			tailBone.WorldCFrame = Start
 
-			CopyPasteAttributes(Bone, tailBone)
+            CopyPasteAttributes(Bone, tailBone)
 
 			self:m_AppendBone(BoneTree, tailBone, #BoneTree.Bones, HeirarchyLength)
 		end
@@ -156,9 +155,9 @@ function Class:m_CreateBoneTree(RootPart: BasePart, RootBone: Bone)
 		SB_UNINDENT_LOG()
 	end
 
-	self:m_AppendBone(BoneTree, RootBone, 0, 0)
+    self:m_AppendBone(BoneTree, RootBone, 0, 0)
 
-	AddChildren(RootBone, 1, 1)
+    AddChildren(RootBone, 1, 1)
 
 	table.insert(self.BoneTrees, BoneTree)
 
@@ -253,7 +252,7 @@ function Class:m_UpdateBoneTree(BoneTree, Index, Delta)
 		BoneTree:PreUpdate()
 		BoneTree:StepPhysics(UpdateHz)
 		self:m_ConstrainBoneTree(BoneTree, Delta)
-		BoneTree:SolveTransform(UpdateHz)
+		BoneTree:SolveTransform(Delta)
 	end
 	debug.profileend()
 
