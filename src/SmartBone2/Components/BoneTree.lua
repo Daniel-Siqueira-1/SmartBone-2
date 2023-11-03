@@ -52,7 +52,7 @@ end
 
 --- @class BoneTree
 --- Internal class for all bone trees
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Changes to the syntax in this class will not count to the major version in semver.
 --- :::
 
@@ -234,8 +234,6 @@ end
 --- Resets all bones to their rest positions.
 function Class:SkipUpdate()
 	debug.profilebegin("BoneTree::SkipUpdate")
-	self:PreUpdate()
-
 	for _, Bone in self.Bones do
 		Bone:SkipUpdate()
 	end

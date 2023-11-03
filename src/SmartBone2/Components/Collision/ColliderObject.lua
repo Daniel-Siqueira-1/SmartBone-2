@@ -2,6 +2,7 @@ local ColliderClass = require(script.Parent:WaitForChild("Collider"))
 local Utilities = require(script.Parent.Parent.Parent:WaitForChild("Dependencies"):WaitForChild("Utilities"))
 
 local SB_VERBOSE_LOG = Utilities.SB_VERBOSE_LOG
+local SleepCycleInterval = 1 / 5
 
 type IRawCollider = {
 	Type: string,
@@ -20,7 +21,7 @@ type IColliderTable = { [number]: IRawCollider }
 
 --- @class ColliderObject
 --- Internal class for collider
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Changes to the syntax in this class will not count to the major version in semver.
 --- :::
 
@@ -44,9 +45,11 @@ Class.__index = Class
 --- @param ColliderTable {[number]: {Type: string, ScaleX: number, ScaleY: number, ScaleZ: number, OffsetX: number, OffsetY: number, OffsetZ: number, RotationX: number, RotationY: number, RotationZ: number}}
 --- @param Object BasePart
 --- @return ColliderObject
-function Class.new(ColliderTable, Object: BasePart)
+function Class.new(ColliderTable: IColliderTable, Object: BasePart)
 	local self = setmetatable({
 		m_Object = Object,
+		m_Awake = true,
+		m_LastSleepCycle = 0,
 		Destroyed = false,
 		Colliders = {},
 	}, Class)
@@ -97,6 +100,20 @@ end
 --- @return {[number]: {ClosestPoint: Vector3, Normal: Vector3}}
 function Class:GetCollisions(Point, Radius)
 	if #self.Colliders == 0 then
+		return {}
+	end
+
+	if os.clock() - self.m_LastSleepCycle >= SleepCycleInterval then -- Run sleep conditions every 5th of a second
+		self.m_LastSleepCycle = os.clock()
+
+		if self.m_Object:IsDescendantOf(workspace) then -- If our object is not a descendant of workspace put it to sleep
+			self.m_Awake = true
+		else
+			self.m_Awake = false
+		end
+	end
+
+	if not self.m_Awake then
 		return {}
 	end
 

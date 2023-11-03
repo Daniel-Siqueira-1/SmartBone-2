@@ -6,7 +6,9 @@ local Dependencies = script.Parent.Parent.Parent:WaitForChild("Dependencies")
 local CollisionSolvers = script.Parent:WaitForChild("Colliders")
 local BoxSolver = require(CollisionSolvers:WaitForChild("Box"))
 local CapsuleSolver = require(CollisionSolvers:WaitForChild("Capsule"))
+local CylinderSolver = require(CollisionSolvers:WaitForChild("Cylinder"))
 local SphereSolver = require(CollisionSolvers:WaitForChild("Sphere"))
+
 local Utilities = require(script.Parent.Parent.Parent:WaitForChild("Dependencies"):WaitForChild("Utilities"))
 
 local SB_VERBOSE_LOG = Utilities.SB_VERBOSE_LOG
@@ -15,9 +17,28 @@ local Radians = 0.017453
 local Gizmo = require(Dependencies:WaitForChild("Gizmo"))
 Gizmo.Init()
 
+local function RoundV3(Vector, Decimals)
+	local X = math.floor(Vector.X * 10 ^ Decimals)
+	local Y = math.floor(Vector.Y * 10 ^ Decimals)
+	local Z = math.floor(Vector.Z * 10 ^ Decimals)
+
+	return X, Y, Z
+end
+
+local function CompareV3(Vector0, Vector1, Decimals)
+	local X0, Y0, Z0 = RoundV3(Vector0, Decimals)
+	local X1, Y1, Z1 = RoundV3(Vector1, Decimals)
+
+	if X0 == X1 and Y0 == Y1 and Z0 == Z1 then
+		return true
+	end
+
+	return false
+end
+
 --- @class Collider
 --- Internal class for colliders
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Changes to the syntax in this class will not count to the major version in semver.
 --- :::
 
@@ -69,18 +90,20 @@ function Class.new()
 		Scale = Vector3.zero,
 		Offset = Vector3.zero,
 		Rotation = Vector3.zero,
+		Radius = 0,
 
 		PreviousScale = Vector3.zero,
 		PreviousOffset = Vector3.zero,
 		PreviousRotation = Vector3.zero,
+		PreviousObjectPosition = Vector3.zero,
+		PreviousObjectRotation = Vector3.zero,
 
 		m_Object = nil,
-		ObjectConnection = nil,
 
 		Transform = CFrame.identity,
 		Size = Vector3.zero,
 
-		GUID = HttpService:GenerateGUID(),
+		GUID = HttpService:GenerateGUID(false),
 	}, Class)
 
 	return self
@@ -89,44 +112,36 @@ end
 --- @within Collider
 --- @param Object BasePart
 function Class:SetObject(Object: BasePart)
-	if self.ObjectConnection then
-		self.ObjectConnection:Disconnect()
-	end
-
 	self.m_Object = Object
 
+	self:FastTransform()
 	self:UpdateTransform()
-
-	self.ObjectConnection = Object.Changed:Connect(function(Prop)
-		if Prop == "CFrame" or Prop == "Size" then
-			self:UpdateTransform()
-		end
-	end)
 end
 
 --- @within Collider
-function Class:UpdateTransform()
-	if self.m_Object == nil then
-		return
-	end
+function Class:UpdateTransform() -- Should I even bother with this, all it really saves is a global call + mat transform
+	local Rotation = self.Rotation
 
+	local RotationCFrame = CFrame.Angles(Rotation.X * Radians, Rotation.Y * Radians, Rotation.Z * Radians)
+
+	self.Transform *= RotationCFrame
+end
+
+--- @within Collider
+function Class:FastTransform()
 	local Object = self.m_Object
 	local ObjectCFrame = Object.CFrame
-	local ObjectPosition = ObjectCFrame.Position
 	local ObjectSize = Object.Size
 
 	local Scale = self.Scale
 	local Offset = self.Offset
-	local Rotation = self.Rotation
 
 	local ScaledOffset = ObjectSize * Offset
 	local ScaledSize = ObjectSize * Scale
 
-	local RotationCFrame = CFrame.Angles(Rotation.X * Radians, Rotation.Y * Radians, Rotation.Z * Radians)
-	local TransformCFrame = CFrame.new(ObjectPosition + ScaledOffset) * ObjectCFrame.Rotation * RotationCFrame
-
-	self.Transform = TransformCFrame
+	self.Transform = ObjectCFrame * CFrame.new(ScaledOffset)
 	self.Size = ScaledSize
+	self.Radius = math.sqrt((math.max(ScaledSize.X, ScaledSize.Y, ScaledSize.Z) * 0.5) ^ 2 * 2)
 end
 
 --- @within Collider
@@ -134,20 +149,21 @@ end
 --- @param Radius number
 --- @return Vector3 | nil -- Returns nil if specified collider shape is invalid
 function Class:GetClosestPoint(Point, Radius)
-	if self.Scale ~= self.PreviousScale then
-		self:UpdateTransform()
-		self.PreviousScale = self.Scale
+	if self.m_Object == nil then
+		return
 	end
 
-	if self.Offset ~= self.PreviousOffset then
-		self:UpdateTransform()
-		self.PreviousOffset = self.Offset
+	self:FastTransform()
+
+	-- If we are outside the radius of the bounding box don't fully update transform and don't do any collision checks
+	-- Broadphase collision detection
+	local PointDistance = (Point - self.Transform.Position).Magnitude - Radius
+
+	if PointDistance > self.Radius then
+		return
 	end
 
-	if self.Rotation ~= self.PreviousRotation then
-		self:UpdateTransform()
-		self.PreviousRotation = self.Rotation
-	end
+	self:UpdateTransform()
 
 	local Type = self.Type
 
@@ -164,25 +180,34 @@ function Class:GetClosestPoint(Point, Radius)
 		return SphereSolver(self.Transform, self.Size, Point, Radius)
 	end
 
-	warn(`Invalid collider shape: {Type}`)
+	if Type == "Cylinder" then
+		return CylinderSolver(self.Transform, self.Size, Point, Radius)
+	end
+
+	-- this crashes studio cause it prints so many times
+	-- warn(`Invalid collider shape: {Type} in object {self.m_Object.Name}`)
 
 	return
 end
 
 --- @within Collider
 --- @param FILL_COLLIDER boolean
-function Class:DrawDebug(FILL_COLLIDER)
+function Class:DrawDebug(FILL_COLLIDER, SHOW_INFLUENCE)
 	local COLLIDER_COLOR = Color3.new(0.509803, 0.933333, 0.427450)
 	local FILL_COLOR = Color3.new(0.901960, 0.784313, 0.513725)
+	local INFLUENCE_COLOR = Color3.new(1, 0.3, 0.3)
 
 	local Type = self.Type
 	local Transform = self.Transform
 	local Size = self.Size
 
-	Gizmo.PushProperty("AlwaysOnTop", false)
+	if SHOW_INFLUENCE or true then
+		Gizmo.SetStyle(INFLUENCE_COLOR, 0, false)
+		Gizmo.Sphere:Draw(Transform, self.Radius, 12, 360)
+	end
 
 	if Type == "Box" then
-		Gizmo.PushProperty("Color3", COLLIDER_COLOR)
+		Gizmo.SetStyle(COLLIDER_COLOR, 0, false)
 		Gizmo.Box:Draw(Transform, Size)
 
 		if FILL_COLLIDER then
@@ -198,7 +223,7 @@ function Class:DrawDebug(FILL_COLLIDER)
 		local CapsuleRadius = math.min(Size.Y, Size.Z) * 0.5
 		local CapsuleLength = Size.X
 
-		Gizmo.PushProperty("Color3", COLLIDER_COLOR)
+		Gizmo.SetStyle(COLLIDER_COLOR, 0, false)
 		Gizmo.Capsule:Draw(Transform, CapsuleRadius, CapsuleLength, 15)
 
 		if FILL_COLLIDER then
@@ -220,7 +245,7 @@ function Class:DrawDebug(FILL_COLLIDER)
 	if Type == "Sphere" then
 		local Radius = math.min(Size.X, Size.Y, Size.Z) * 0.5
 
-		Gizmo.PushProperty("Color3", COLLIDER_COLOR)
+		Gizmo.SetStyle(COLLIDER_COLOR, 0, false)
 		Gizmo.Sphere:Draw(Transform, Radius, 15, 360)
 
 		if FILL_COLLIDER then
@@ -231,15 +256,26 @@ function Class:DrawDebug(FILL_COLLIDER)
 
 		return
 	end
+
+	if Type == "Cylinder" then
+		local Radius = math.min(Size.Y, Size.Z) * 0.5
+
+		Gizmo.SetStyle(COLLIDER_COLOR, 0, false)
+		Gizmo.Cylinder:Draw(Transform, Radius, Size.X, 15)
+
+		if FILL_COLLIDER then
+			Gizmo.SetStyle(FILL_COLOR, 0.75, false)
+			Gizmo.VolumeCylinder:Draw(Transform, Radius, Size.X, 0, 360)
+			Gizmo.PushProperty("Transparency", 0)
+		end
+
+		return
+	end
 end
 
 --- @within Collider
 function Class:Destroy()
 	SB_VERBOSE_LOG(`Collider destroying, object: {self.m_Object}`)
-
-	if self.ObjectConnection then
-		self.ObjectConnection:Disconnect()
-	end
 
 	setmetatable(self, nil)
 end

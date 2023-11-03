@@ -19,6 +19,10 @@ local ActorRuntime = Dependencies:WaitForChild("Runtime")
 local ColliderTranslations = {
 	Block = "Box",
 	Ball = "Sphere",
+	Capsule = "Capsule",
+	Sphere = "Sphere",
+	Box = "Box",
+	Cylinder = "Cylinder",
 }
 
 local function CopyPasteAttributes(Object1: BasePart, Object2: BasePart)
@@ -78,7 +82,7 @@ end
 --- @param BoneObject Bone
 --- @param ParentIndex number
 --- @param HeirarchyLength number
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Private Functions can change syntax at any time without warning. Only use these if you're prepared to fix any issues that arise.
 --- :::
 --- Used to add a bone to the provided bone tree
@@ -113,7 +117,7 @@ end
 --- @within SmartBone
 --- @param RootPart BasePart
 --- @param RootBone Bone
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Private Functions can change syntax at any time without warning. Only use these if you're prepared to fix any issues that arise.
 --- :::
 --- Creates a bone tree from the RootPart and RootBone and then adds all child bones via m_AppendBone
@@ -141,7 +145,10 @@ function Class:m_CreateBoneTree(RootPart: BasePart, RootBone: Bone)
 
 		if #Children == 0 then -- Add tail bone for transform calculations
 			SB_VERBOSE_LOG(`Adding tail bone`)
-			local Start = Bone.WorldCFrame + (Bone.WorldCFrame.UpVector.Unit * (Bone.WorldPosition - Bone.Parent.WorldPosition).Magnitude)
+			local Parent = Bone.Parent
+			local ParentWorldPosition = Parent:IsA("Bone") and Parent.WorldPosition or Parent.Position
+
+			local Start = Bone.WorldCFrame + (Bone.WorldCFrame.UpVector.Unit * (Bone.WorldPosition - ParentWorldPosition).Magnitude)
 			local tailBone = Instance.new("Bone")
 			tailBone.Parent = Bone
 			tailBone.Name = Bone.Name .. "_Tail"
@@ -166,7 +173,7 @@ end
 
 --- @private
 --- @within SmartBone
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Private Functions can change syntax at any time without warning. Only use these if you're prepared to fix any issues that arise.
 --- :::
 --- Updates the view frustum used for optimization
@@ -202,7 +209,7 @@ end
 --- @within SmartBone
 --- @param BoneTree table
 --- @param Delta number
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Private Functions can change syntax at any time without warning. Only use these if you're prepared to fix any issues that arise.
 --- :::
 --- Constrains each bone in the provided bone tree and cleans up colliders
@@ -219,7 +226,7 @@ end
 --- @param BoneTree table
 --- @param Index number
 --- @param Delta number
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Private Functions can change syntax at any time without warning. Only use these if you're prepared to fix any issues that arise.
 --- :::
 --- Updates the provided bone tree with all optomizations
@@ -232,11 +239,13 @@ function Class:m_UpdateBoneTree(BoneTree, Index, Delta)
 		return
 	end
 
-	BoneTree:PreUpdate()
+	BoneTree:PreUpdate() -- Pre update MUST be called before we call SkipUpdate!
 
 	if not BoneTree.InView or BoneTree.UpdateRate == 0 then
-		task.synchronize()
 		BoneTree:SkipUpdate()
+
+		task.synchronize()
+		BoneTree:ApplyTransform()
 		return
 	end
 
@@ -265,7 +274,7 @@ end
 --- @private
 --- @within SmartBone
 --- @return boolean
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Private Functions can change syntax at any time without warning. Only use these if you're prepared to fix any issues that arise.
 --- :::
 --- Returns true if the root should be destroyed
@@ -298,7 +307,7 @@ function Class:LoadObject(Object: BasePart)
 	for _, Name in RootNames do
 		local RootBone = Object:FindFirstChild(Name)
 		if not RootBone then
-			warn(`[BonePhysics::LoadObject] Couldn't find Root Bone of name: {Name}`)
+			warn(`[BonePhysics::LoadObject] Couldn't find Root Bone of name: {Name} in RootPart: {Object.Name}`)
 			continue
 		end
 
@@ -480,7 +489,7 @@ function Class.Start()
 			end
 
 			if obj:IsA("Part") then -- Allow meshes and unions to have colliders
-				return obj.Shape
+				return obj.Shape.Name
 			end
 
 			return "Box"
@@ -489,16 +498,18 @@ function Class.Start()
 		local ColliderType = ColliderTranslations[GetShapeName(Object)] or "Box"
 
 		ColliderDescription = {
-			Type = ColliderType,
-			ScaleX = 1,
-			ScaleY = 1,
-			ScaleZ = 1,
-			OffsetX = 0,
-			OffsetY = 0,
-			OffsetZ = 0,
-			RotationX = 0,
-			RotationY = 0,
-			RotationZ = 0,
+			{
+				Type = ColliderType,
+				ScaleX = 1,
+				ScaleY = 1,
+				ScaleZ = 1,
+				OffsetX = 0,
+				OffsetY = 0,
+				OffsetZ = 0,
+				RotationX = 0,
+				RotationY = 0,
+				RotationZ = 0,
+			},
 		}
 
 		return ColliderDescription

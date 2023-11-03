@@ -67,49 +67,52 @@ local function SolveWind(self, BoneTree)
 
 	local WindMove
 
+	local function GetNoise(X, Y, Z, Map) -- Returns noise between 0, 1
+		local Value = math.noise(X, Y, Z)
+		Value = math.clamp(Value, -1, 1)
+
+		if Map then
+			Value ^= 2
+		end
+
+		return Value
+	end
+
+	local function SampleSin()
+		local Freq = Settings.WindSpeed ^ 0.8
+		local Power = Settings.WindSpeed ^ 0.9
+		local Amp = Settings.WindStrength * 10
+		local Sin1 = math.sin(TimeModifier * Freq) ^ 2
+		local Sin2 = math.cos(TimeModifier * Freq) ^ 2 - 0.2
+		local Wave = (Sin1 > Sin2 and Sin1 or Sin2) * (Power + Amp)
+		return Settings.WindDirection * Wave
+	end
+
+	local function SampleNoise(CustomAmp, Map)
+		CustomAmp = CustomAmp or 0
+
+		local Freq = Settings.WindSpeed ^ 0.8
+		local Power = Settings.WindSpeed ^ 0.9
+		local Amp = Settings.WindStrength * 10
+		local Seed = BoneTree.WindOffset
+
+		local X = GetNoise(Freq, 0, Seed, Map) * (Power + Amp + CustomAmp)
+		local Y = GetNoise(0, Freq, Seed, Map) * (Power + Amp + CustomAmp)
+		local Z = GetNoise(Seed, 0, Freq, Map) * (Power + Amp + CustomAmp)
+
+		return Settings.WindDirection * Vector3.new(X, Y, Z)
+	end
+
 	if Settings.WindType == "Sine" then
-		local sineWave = math.sin(TimeModifier * Settings.WindSpeed)
-		WindMove = Vector3.new(
-			Settings.WindDirection.X + (Settings.WindDirection.X * sineWave),
-			Settings.WindDirection.Y + (Settings.WindDirection.Y * sineWave),
-			Settings.WindDirection.Z + (Settings.WindDirection.Z * sineWave)
-		)
+		WindMove = SampleSin()
 	elseif Settings.WindType == "Noise" then
-		local frequency = TimeModifier * Settings.WindSpeed
-		local seed = BoneTree.WindOffset
-		local amp = Settings.WindStrength * 10
-
-		local X = math.noise(frequency, 0, seed) * amp
-		local Y = math.noise(frequency, 0, -seed) * amp
-		local Z = math.noise(frequency, 0, seed + seed) * amp
-
-		WindMove = Vector3.new(
-			Settings.WindDirection.X + (Settings.WindDirection.X * X),
-			Settings.WindDirection.Y + (Settings.WindDirection.Y * Y),
-			Settings.WindDirection.Z + (Settings.WindDirection.Z * Z)
-		)
+		WindMove = SampleNoise(0, true)
 	elseif Settings.WindType == "Hybrid" then
-		local sineWave = math.sin(TimeModifier * Settings.WindSpeed)
-		WindMove = Vector3.new(
-			Settings.WindDirection.X + (Settings.WindDirection.X * sineWave),
-			Settings.WindDirection.Y + (Settings.WindDirection.Y * sineWave),
-			Settings.WindDirection.Z + (Settings.WindDirection.Z * sineWave)
-		)
-
-		local frequency = TimeModifier * Settings.WindSpeed
-		local seed = BoneTree.WindOffset
-		local amp = Settings.WindStrength * 10
-
-		local X = math.noise(frequency, 0, seed) * amp
-		local Y = math.noise(frequency, 0, -seed) * amp
-		local Z = math.noise(frequency, 0, seed + seed) * amp
-
-		WindMove += Vector3.new(
-			Settings.WindDirection.X + (Settings.WindDirection.X * X),
-			Settings.WindDirection.Y + (Settings.WindDirection.Y * Y),
-			Settings.WindDirection.Z + (Settings.WindDirection.Z * Z)
-		)
+		WindMove = SampleSin()
+		WindMove += SampleNoise(0.5, true)
 		WindMove *= 0.5
+	else
+		return WindMove -- If the wind type the user inputted doesnt exist, I would throw an error / warn but that would crash studio :(
 	end
 
 	WindMove /= self.FreeLength
@@ -121,7 +124,7 @@ end
 
 --- @class Bone
 --- Internal class for all bones
---- :::caution Caution: Warning
+--- :::caution Caution:
 --- Changes to the syntax in this class will not count to the major version in semver.
 --- :::
 
@@ -266,6 +269,10 @@ function Class:PreUpdate(BoneTree) -- Parallel safe
 
 	self.AnimatedWorldCFrame = QueryTransformedWorldCFrame(self.Bone)
 
+	if self.ParentIndex < 1 then -- Force anchor the root bone
+		self.Anchored = true
+	end
+
 	if self.Bone == self.RootBone then
 		self.TransformOffset = RootPart.CFrame * self.RootTransform
 	else
@@ -336,11 +343,10 @@ end
 --- Returns bone to rest position
 function Class:SkipUpdate()
 	if self.FirstSkipUpdate == false then
-		self.Bone.WorldCFrame = self.TransformOffset
+		self.Position = self.TransformOffset.Position
 		self.FirstSkipUpdate = true
 	end
 
-	self.AnimatedWorldCFrame = self.Bone.TransformedWorldCFrame
 	self.Position = self.Bone.WorldPosition
 	self.LastPosition = self.Position
 end
